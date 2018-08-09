@@ -1,8 +1,8 @@
 import re
+import sys
 from argparse import ArgumentParser
 
-import git
-from git import Git, Repo
+from git import Git, Repo, GitCommandError
 
 '''
 Дан Git репозиторий, с несколькими ветками: master, A, B, C.
@@ -30,13 +30,18 @@ def merge(repo: Repo, source, target):
             git_cli.rebase('--onto', onto_commit, from_commit)
             break
 
-    git_cli.merge(source, squash=True)
+    try:
+        git_cli.merge(source, squash=True)
 
-    if not repo.is_dirty():
-        print(f'Cannot merge {source} into {target}. Branches are equal and they have never been merged before.')
-        exit(1)
+        if not repo.is_dirty():
+            sys.exit(f'Cannot merge {source} into {target}. Branches are equal and they have never been merged before.')
 
-    git_cli.commit('-m', f'Merged:{source}:{repo.heads[source].commit}')
+        git_cli.commit('-m', f'Merged:{source}:{repo.heads[source].commit}')
+
+    except GitCommandError as exc:
+
+        git_cli.reset(hard=True)
+        sys.exit(f'Command failed: {" ".join(exc.command)}\nReason:{exc.stderr or exc.stdout}')
 
 
 if __name__ == "__main__":
@@ -47,6 +52,6 @@ if __name__ == "__main__":
 
     args = arg_parser.parse_args()
 
-    repo = git.Repo(args.git_path)
+    repo = Repo(args.git_path)
 
     merge(repo, args.source, args.target)
